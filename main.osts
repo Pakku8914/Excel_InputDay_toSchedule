@@ -1,0 +1,101 @@
+// main関数
+function main(workbook: ExcelScript.Workbook) {
+    const oneDayTask = 7.75;
+    let currentDayTask = 7.75;
+    
+    // アクティブなセルとワークシートを取得します。
+    let selectedSheet = workbook.getActiveWorksheet();
+    
+    // データ挿入開始行
+    let currentRow = 10;
+
+    // 初期開始日取得
+    let getInitDay = selectedSheet.getRange("U2").getValue();
+    let initDay = changeDate(getInitDay);
+    
+    // 挿入データ
+    let beginDay = initDay;
+    let endDay = initDay;
+
+    while(true) {
+        // 1行データ取得
+        let rowData = selectedSheet.getRange(`B${currentRow}:M${currentRow}`).getValues();
+        // 1行前の日付引き継ぎ
+        beginDay = endDay;
+
+        // B列が空のとき
+        if (rowData[0][0] === "") {
+            break;
+        }
+        // F列が空のとき
+        if (rowData[0][4] === "") {
+            currentRow++;
+            continue;
+        }
+
+        // 計画工数が1日以上のとき
+        if(rowData[0][4] > 7.75) {
+            let numOfDay = rowData[0][4] / 7.75;
+            let numOfTime = rowData[0][4] - 7.75 * numOfDay;
+
+            // 終了日 日付設定
+            endDay = addDays(endDay, numOfDay);
+
+            // 残時間処理
+            if (numOfTime > currentDayTask) { // 残りタスク時間より多い
+                endDay = addDays(endDay, 1);
+                currentDayTask = oneDayTask - numOfTime - currentDayTask;
+            }
+            else { // 残りタスク時間より少ない
+                currentDayTask -= numOfTime;
+            }
+        }
+        else if (rowData[0][4] <= 7.75){
+            // 現在の計画工数
+            let numOfTime = rowData[0][4];
+
+            // 残時間処理
+            if (numOfTime > currentDayTask) { // 残りタスク時間より多い
+                endDay = addDays(endDay, 1);
+                currentDayTask = oneDayTask - numOfTime - currentDayTask;
+            }
+            else { // 残りタスク時間より少ない
+                currentDayTask -= numOfTime;
+            }
+        }
+
+        inputDate();
+        currentRow++;
+    }
+
+    function inputDate() {
+        selectedSheet.getRange(`L${currentRow}`).setValue(beginDay.toLocaleDateString("ja-JP"));
+        selectedSheet.getRange(`M${currentRow}`).setValue(endDay.toLocaleDateString("ja-JP"));
+    }
+
+    function addDays(date: Date, days: number): Date {
+        // 現在の日時のミリ秒取得
+        let result = new Date(date.getTime());
+
+        while(days > 0) {
+            result.setDate(result.getDate() + 1);
+
+            // 土日スキップ
+            if(result.getDay() !== 0 && result.getDay() !== 6) {
+                days--;
+            }
+        }
+
+        // 新しい日付を返す
+        return result;
+    }
+}
+
+// 日付をDate構造体に変換する関数
+function changeDate(target_date: number) {
+    // 1900年1月1日を基準にして日付を変換 (1日目は1900/1/1)
+    let excelStartDate = new Date(1899, 11, 30); // JavaScriptの月は0から始まるため12月は11
+    let date = new Date(excelStartDate.getTime() + target_date * 24 * 60 * 60 * 1000); // シリアル値を日数に変換
+
+    return date;
+}
